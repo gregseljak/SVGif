@@ -3,16 +3,10 @@
 import os
 os.getcwd()
 #%%
-
-from IPython.display import SVG, display, HTML
-with open("./123.svg") as file:
-    svg = file.read()
-def show_svg():
-    display(SVG("./123.svg"))
-show_svg()
-
+os.system("pdftocairo -svg ~/grego/Desktop/target.pdf ./yuukito.svg")
+print(" svg in current dir ")
 # %%
-targetfile="./123.svg"
+targetfile="./yuukito.svg"
 with open(targetfile) as file:
     source=file.read()
 headTag='''<g id="surface1">'''
@@ -21,7 +15,17 @@ head=source[:htIdx]
 foot="</g>\n</svg>"
 lines=source[htIdx:].strip("\n").split("\n")[:-2]
 #%%
+def create_outdir():
+    base_dir = "./output"
+    code = 0
+    while True:
+        output_dir = f"{base_dir}{code}"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            return output_dir
+        code += 1
 
+output_dir=create_outdir()
 def parse_cds(_instr):
     instr=_instr.replace("L ","").strip(" ")
     instr=instr.split(" ")
@@ -56,20 +60,30 @@ def produce_image(output_list,g):
     outnum=str(len(output_list))
     while len(outnum)<6:
         outnum="0"+outnum
-    outdirname = "/mnt/c/Users/grego/Desktop/test/testanim_"+\
+    outdirname = output_dir+"/"+\
         outnum+".svg"
     with open(outdirname, 'w') as writer:
         writer.write(outstr)
+    defWidth=1404
+    defHeight=1872
+    w=int(3*defWidth)
+    h=int(3*defHeight)
+    pngcommand='rsvg-convert -w '+str(w)+' -h '+str(h)+' -b "white" '+outdirname+\
+        ' -o "'+output_dir+"/"+outnum+'.png"'
+    rmsvg="rm "+outdirname
+    os.system(pngcommand)
+    os.system(rmsvg)
 
 def detect_discontinuity(cds,current):
     eps=5
     return (abs(current[0]-cds[0])>eps\
              or abs(current[1]-cds[1])>eps)
-        
+
+
 output_list=[head]
 
 g=0
-stride=10
+stride=15
 currentX=0
 currentY=0
 strokePause=2
@@ -103,3 +117,9 @@ while len(lines)>0:
 output_list.append(foot)
 output="\n".join(output_list)
 # %%
+
+outname=output_dir.strip("./")
+print("outname = "+outname)
+os.system('''ffmpeg -framerate 60 -pattern_type glob -i "'''+\
+        output_dir +'''/*.png" -r 30 -pix_fmt yuv420p ~/grego'''+\
+        '''/Desktop/'yuuki mar2024'/'''+outname+'''.mp4''')
