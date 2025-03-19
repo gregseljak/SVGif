@@ -16,7 +16,8 @@ class Svgif():
         self.basename=path.basename(self.infile).rstrip(".pdf").rstrip(".svg")
         self.horizontal=not args.r
         self.pgnm=args.pgnm
-
+        if self.outfile is None:
+            self.outfile=""
         #infile management
         if self.infile.endswith(".pdf"):
             self.pdf_to_svg()
@@ -33,7 +34,9 @@ class Svgif():
             self.pngdir=self.infile
 
         #outfile management
-        if self.outfile.startswith("."):
+        if len(self.outfile)==0:
+            self.outfile=f"./{self.basename}"
+        elif self.outfile.startswith("."):
             self.outfile="."+self.outfile[1:].split(".")[0] #in case of ./
         else:
             self.outfile=self.outfile.split(".")[0]
