@@ -9,7 +9,7 @@ class Svgif():
         self.setRenderParams()
         self.infile=args.i
         self.outfile=args.o
-
+        self.Tmp=args.T
         if self.infile is None:
             print("-i infile is a required argument")
             quit()
@@ -50,7 +50,9 @@ class Svgif():
         """
         subdirectory under svgif for the .pngs; checks for filename conflicts.
         """
-        base_dir = "./png"
+        base_dir = f"./{basename}"
+        if self.Tmp:
+            base_dir=f"/Tmp/desalabg/pngRenders/{self.basename}"
         code = 0
         while True:
             pngdir = f"{base_dir}{code}"
@@ -255,6 +257,7 @@ parser.add_argument("-o", type=str) #output .mov file
 parser.add_argument("-r", action="store_true", default=False,
     help=" store_true flag; put -r to render a video which is the same orientation as the pngs."+\
         " This is a 90* counterclockwise rotation from the default, and will affect the render (not output metadata).")
+parser.add_argument("-T",action="store_true", default=False)
 parser.add_argument("--pgnm", type=int)
 args=parser.parse_args()
 
