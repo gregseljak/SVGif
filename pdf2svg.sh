@@ -1,1 +1,0 @@
-pdftocairo -svg sourcefile.pdf output.svg
