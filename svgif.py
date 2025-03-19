@@ -55,7 +55,7 @@ class Svgif():
             base_dir=f"/Tmp/desalabg/pngRenders/{self.basename}"
         code = 0
         while True:
-            pngdir = f"{base_dir}{code}"
+            pngdir = f"{base_dir}_{code}"
             if not os.path.exists(pngdir):
                 os.makedirs(pngdir)
                 return pngdir
