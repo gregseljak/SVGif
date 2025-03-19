@@ -50,7 +50,7 @@ class Svgif():
         """
         subdirectory under svgif for the .pngs; checks for filename conflicts.
         """
-        base_dir = f"./{basename}"
+        base_dir = f"./{self.basename}"
         if self.Tmp:
             base_dir=f"/Tmp/desalabg/pngRenders/{self.basename}"
         code = 0
