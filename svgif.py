@@ -38,7 +38,7 @@ class Svgif():
         else:
             self.outfile=self.outfile.split(".")[0]
 
-        #self.exportmp4()
+        self.exportmp4()
         self.exportmov()
 
     def setRenderParams(self):
