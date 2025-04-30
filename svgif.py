@@ -10,6 +10,7 @@ class Svgif():
         self.infile=args.i
         self.outfile=args.o
         self.Tmp=args.T
+        self.svgonly=False
         if self.infile is None:
             print("-i infile is a required argument")
             quit()
@@ -19,36 +20,34 @@ class Svgif():
         #outfile management
         if self.outfile is None:
             self.outfile=f"./{self.basename}"
-        elif self.outfile.startswith("."):
-            self.outfile="."+self.outfile[1:].split(".")[0] #in case of ./
         else:
-            self.outfile=self.outfile.split(".")[0]
+            if self.outfile.endswith(".svg"):
+                self.svgonly=True
+            if self.outfile.startswith("./"):
+                self.outfile="."+self.outfile[1:].split(".")[0] 
+            else:
+                self.outfile=self.outfile.split(".")[0]
 
         #infile management
         if self.infile.endswith(".pdf"):
             self.pdf_to_svg()
-
-            if self.outfile.endswith(".svg"):
+            if self.svgonly:
                 return
             else:
-                self.makenewpngdir()
                 self.exportpngs()
         elif self.infile.endswith(".svg"):
             self.svgfile=self.infile
-            self.makenewpngdir()
             self.exportpngs()
         else:
             self.pngdir=self.infile
-
-
-
         self.exportmp4()
-        self.exportmov()
+
 
     def setRenderParams(self):
         self.keyTol=0.9
         self.keyBlur=0.2
         self.rendRes=int(3*1080)
+
 
     def makenewpngdir(self):
         """
@@ -71,13 +70,12 @@ class Svgif():
             pgnmstr=f" -f {pgnm} -l {pgnm}"
         else:
             pgnmstr=""
-        if (not ("." in self.outfile[1:]) or self.outfile.endswith(".mp4")):
-            if pgnmstr=="":
-                self.svgfile="./"+self.basename+".svg"
-            else:
-                self.svgfile="./"+self.basename+f"_p{pgnm}.svg"
+        
+        if pgnmstr=="":
+            self.svgfile="./"+self.basename+".svg"
         else:
-            self.svgfile=self.outfile
+            self.svgfile="./"+self.basename+f"_p{pgnm}.svg"
+
         os.system("pdftocairo -svg"+ pgnmstr+f" {self.infile} {self.svgfile}")
 
     def exportpngs(self):
@@ -104,7 +102,6 @@ class Svgif():
         currentX=0
         currentY=0
         # %%
-
 
         headTag='''<g id="surface1">'''
         htIdx=source.find(headTag)+len(headTag)
