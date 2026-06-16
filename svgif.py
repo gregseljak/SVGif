@@ -41,6 +41,7 @@ class Svgif():
         else:
             self.pngdir=None
             self._render()
+            self.export_mp4()
 
 
     def pdf_to_svg(self):
@@ -62,16 +63,21 @@ class Svgif():
         pngdir=self.pngdir
 
         print(f"svgrender.py: pngdir={pngdir} outpath={outpath}\n")
-        resolution=int(1080*2)
+        #resolution=int(1080*2)
+        resolution=1920
         if self.horizontal:
-            vfStr=f'-vf "scale=-1:{resolution},transpose=1"'
+            #vfStr=f'-vf "scale=-1:{resolution},transpose=1"'
+            vfStr=f'-vf "scale={resolution}:-2,transpose=1"'
         else:
-            vfStr=f"-vf scale=-1:{resolution}"
+            vfStr=f'-vf "scale={resolution}:-2"'
+            #vfStr=f"-vf scale=-1:{resolution}"
         print("output to "+outpath)
         finalcommand=\
             "ffmpeg -framerate 60 -pattern_type glob -i '"+\
-            f"{pngdir}*.png' {vfStr} -r 30 -pix_fmt yuv420p "+\
-            " -y "+outpath
+            f"{pngdir}*.png' {vfStr}"\
+            +" -c:v libx264 -crf 12 -preset slow"\
+            +" -r 60 -pix_fmt yuv420p "\
+            +" -y "+outpath
         
         print(finalcommand+"\n\n")
         os.system(finalcommand)
@@ -84,6 +90,7 @@ class Svgif():
                   outfile=self.outfile,
                       pngdir=self.pngdir,
                       stride=self.stride).draw_frames()
+        
 
 
     def _makenewpngdir(self):
@@ -104,14 +111,14 @@ class Svgif():
 ### -------- -------- ------- ###
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", type=str) #input .pdf file
-    parser.add_argument("-o", type=str) #output .mov file
+    parser.add_argument("-i", type=str,required=True) #input .pdf file
+    parser.add_argument("-o", type=str) #output .mp4 file
     parser.add_argument("-r", action="store_true", default=False,
         help=" store_true flag; put -r to render a video which is"+\
             "the same orientation as the pngs. This is a 90* counterclockwise"+\
             " rotation from the default, "+\
             "and will affect the render (not output metadata).")
-    parser.add_argument("--pgnm", type=int)
+    parser.add_argument("--pgnm", type=int,required=True)
     parser.add_argument("--stride", type=int, default=30)
     args=parser.parse_args()
 

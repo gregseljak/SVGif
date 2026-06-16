@@ -1,18 +1,55 @@
 import re
 import os
 
-HEADER="""<svg xmlns="http://www.w3.org/2000/svg" """+\
-    'xmlns:xlink="http://www.w3.org/1999/xlink" width="1404pt"'+\
-    """ height="1872pt" viewBox="0 0 1404 1872" version="1.2">\n"""+\
-    """<g id="surface1">\n"""+\
-    """<use xlink:href="#image6" mask="url(#mask0)"/>"""
-LINESTART='<path style=" stroke:none'
-FOOTER="""</g>\n</svg>"""
 
-            
+"""
+Boox is extremely unpredictable in its output format.
+I have to rewrite this from scratch every time there's an update!
+"""
 
+LINESTART='<path fill="none"'
+
+FOOTER="</svg>"
 class SvgRaster():
    
+    def create_idxlist(self, svgstring:str, stride:int):
+        """
+        Reports the indices of bodylines that should be tied together.
+        TODO: make more sophisticated. This is where errors should be caught + handled.
+        """
+        idxlist=[]
+        tags=["<svg"]
+        cnt=0
+        all_lines=svgstring
+        
+        recognized_tags=["<g","<defs"]
+        for tag in recognized_tags:
+            closetag=f"{tag.replace("<","</")}>"
+            all_lines=all_lines.replace(f"{closetag}",f"\n{closetag}")\
+                .replace(f"\n\n{closetag}",f"\n{closetag}")
+        all_lines=all_lines.split("\n")
+        for i in range(len(all_lines)-2):
+            line=all_lines[i]
+            for recognized_tag in recognized_tags:
+                if line.startswith(recognized_tag):
+                    tags.insert(0,recognized_tag)
+                    break
+                if line==f'{recognized_tag.replace("<","</")}>':
+                    tags.remove(recognized_tag)
+                    break
+            if line.startswith(LINESTART):
+                if all_lines[i-1].startswith(LINESTART) or all_lines[i+1].startswith(LINESTART):
+                    cnt+=1
+            if cnt%stride==1:
+                cnt=2
+                idxlist.append({
+                    "line_idx":i+1,
+                    "frame":len(idxlist),
+                    "footer":[tag.replace("<","</")+">" for tag in tags]}
+                )
+        return idxlist
+    
+
     def __init__(self,
                 svgfile=None,
                 pngdir=None,
@@ -22,7 +59,8 @@ class SvgRaster():
         """SVG utility class for svgif2"""
         self.pngdir=pngdir
         self.outfile=outfile
-        
+        self.header=None
+        self.svgfile=svgfile
         if not self.pngdir.endswith("/"):
             self.pngdir+="/"
         assert outfile is not None
@@ -30,69 +68,79 @@ class SvgRaster():
         assert self.pngdir is not None
         self.stride=kwargs.get("stride",500)
         self.defWidth=kwargs.get("svgwidth", 1404)
-        self.defHeight=kwargs.get("svgheight", 1872)
+        self.defHeight=kwargs.get("svgheight", 1053)
+        self.debug=kwargs.get("debug", False)
+
         self.horizontal=horizontal
+
+        linestarts=[
+            "</defs>\n"+LINESTART,
+            ' viewBox="0 0 1404 1053">\n'+LINESTART,
+            "</g>\n"+LINESTART,
+            LINESTART]
         with open(svgfile, "r") as file:
             self.svgtext=file.read()
+        for i in range(len(linestarts)):
+            if linestarts[i] in self.svgtext:
+                self.init_linestart=linestarts[i]
+                print(f"Found {self.init_linestart}")
+                break
         self.draw_frames()
 
-    def draw_frames(self):
+    def draw_frames(self, idxs:list=None):
         from time import gmtime, strftime
-        stride=self.stride
         import os
-        os.system(f"rm {self.pngdir}*")
+        os.system(f"rm {self.pngdir}* >/dev/null 2>&1")
         os.getcwd()
         svgtext=self.svgtext
-        bodylines=svgtext[svgtext.find(LINESTART):].split("\n")
-        write_pieces=[]
-        currentline=[]
-        _progresspoints=[4/1,4/2,4/3]
-        frame=-1
-        for line in bodylines:
-            if not line.startswith(LINESTART):
-                continue
-            preamble=line[:line.find('d="')]+'d="'
-            currentline=\
-                re.split(r'(?=[A-Z])', line[len(preamble):])
-                # Take [1:] because first index is ''
-            write_pieces.append("\n"+preamble)
-
-            while len(currentline)>0:
-                frame+=1
-                write_pieces.extend(
-                    currentline[:min(stride,len(currentline))])
-                currentline=currentline[min(stride,len(currentline)):]
-                # assemble outstring and write temp {frame}.svg
-                line_end=' "/>'
-                if write_pieces[-1].endswith(line_end):
-                    line_end=""
-                outstring=svgtext[:svgtext.find(LINESTART)]\
-                        +''.join(write_pieces)\
-                        +line_end+'\n'+FOOTER
-                temp_svgpath=f"{self.pngdir}{frame:05}.svg"
-                with open(temp_svgpath,"w") as file:
-                    file.write(outstring)
-                # rasterize from {frame}.svg
-                w=int(3*self.defWidth)
-                h=int(3*self.defHeight)
-                pngcommand=f'rsvg-convert -w {w} -h {h} -b "white" '+\
-                    f'{temp_svgpath} -o "{self.pngdir}{frame:05}.png"'
-                rmsvg="rm "+temp_svgpath
-                os.system(pngcommand)
+        stride=self.stride
+        ### make a preview
+        w=int(5*self.defWidth)
+        h=int(5*self.defHeight)
+        _preview_file=f"{self.pngdir}_preview.png"
+        preview_cmd=f'rsvg-convert -w {w} -h {h} -b "white" '+\
+                f'{self.svgfile} -o "{_preview_file}"'
+        os.system(preview_cmd)
+        if self.debug:
+            print(preview_cmd)
+        if idxs==None:
+            idxs=self.create_idxlist(svgtext,stride)
+        print(len(idxs))
+        all_lines=self.svgtext.split("\n")
+        _progresspoints = [int(len(idxs) * p / 8) for p in range(1, 9)]
+        if self.debug:
+            idxs=idxs[::len(idxs)//40]
+        for i in range(len(idxs)):
+            idx=idxs[i]
+            if i in _progresspoints:
+                print(f"SvgRaster.draw_frames: {i:06}/{len(idxs)}")
+                print(idx)
+            elif self.debug:
+                print(idx)
+                
+            frame=idx["frame"]
+            outstring="\n".join(
+                all_lines[:idx["line_idx"]]\
+                +idx["footer"]
+                )
+            # output file
+            temp_svgpath=f"{self.pngdir}{frame:06}.svg"
+            with open(temp_svgpath,"w") as file:
+                file.write(outstring)
+            # rasterize from {frame}.svg
+            pngcommand=f'rsvg-convert -w {w} -h {h} -b "white" '+\
+                f'{temp_svgpath} -o "{self.pngdir}{frame:06}.png"'
+            rmsvg="rm "+temp_svgpath
+            os.system(pngcommand)
+            if not self.debug:
                 os.system(rmsvg)
+            
                 
-                if len(outstring)*_progresspoints[0]>len(svgtext):
-                    print(strftime("%Y-%m-%d %H:%M:%S", gmtime())+\
-                          f" : {4-len(_progresspoints)}/4")
-                    _progresspoints=_progresspoints[1:]
-                    if len(_progresspoints)==0:
-                        outstring=[0]
-                
-    
+        os.system(f"rm {_preview_file}")
         for i in range(240):
-            unconflicted_name=f"{self.pngdir}{frame:05}_{str(i)}.png"
+            unconflicted_name=f"{self.pngdir}{frame:06}_{str(i)}.png"
             os.system(\
-                f"cp {self.pngdir}{frame:05}.png {unconflicted_name}"\
+                f"cp {self.pngdir}{frame:06}.png {unconflicted_name}"\
                     )
 
 
@@ -100,10 +148,12 @@ class SvgRaster():
 
 def main():
     svgrender=SvgRaster(\
-        svgfile="./wp2.svg",
-        pngdir="./wp2_0/",
-        outfile="/mnt/c/Users/grego/Desktop/testout.mp4")
-    svgrender.render()
+        svgfile="./iranmap4.svg",
+        pngdir="./iranmap_2/",
+        outfile="/mnt/c/Users/grego/Desktop/testout.mp4",
+        stride=60,
+        debug=False)
+    
 
 if __name__=="__main__":
     testline=main()
