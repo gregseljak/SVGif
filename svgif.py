@@ -27,7 +27,7 @@ class Svgif():
         self.horizontal=not args.r
         self.pgnm=args.pgnm
         self.stride=args.stride
-    
+        
         ### Render logic
         if self.infile.endswith(".pdf"):
             self.svgfile=self.pdf_to_svg()
@@ -58,8 +58,8 @@ class Svgif():
         os.system("pdftocairo -svg"+ pgnmstr+f" {self.infile} {svgfile}")
         return svgfile
 
-    def export_mp4(self):
-        outpath=self.outfile
+    def export_mp4(self, preview=False):
+        outpath=os.path.join(self.pngdir,self.outfile)
         pngdir=self.pngdir
 
         print(f"svgrender.py: pngdir={pngdir} outpath={outpath}\n")
@@ -74,18 +74,21 @@ class Svgif():
         print("output to "+outpath)
         finalcommand=\
             "ffmpeg -framerate 60 -pattern_type glob -i '"+\
-            f"{pngdir}*.png' {vfStr}"\
+            f"{pngdir}/*.png' {vfStr}"\
             +" -c:v libx264 -crf 12 -preset slow"\
             +" -r 60 -pix_fmt yuv420p "\
             +" -y "+outpath
         
         print(finalcommand+"\n\n")
+        if preview:
+            return
         os.system(finalcommand)
-        quit()
+        
 
     def _render(self):
         self.pngdir=self._makenewpngdir()
         print(f" self.pngdir : {self.pngdir}")
+        self.export_mp4(preview=True)
         SvgRaster(svgfile=self.svgfile,
                   outfile=self.outfile,
                       pngdir=self.pngdir,
